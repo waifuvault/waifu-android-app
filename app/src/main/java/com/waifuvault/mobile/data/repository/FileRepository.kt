@@ -1,19 +1,21 @@
 package com.waifuvault.mobile.data.repository
 
 import com.waifuvault.mobile.data.remote.ApiClient
+import com.waifuvault.mobile.data.remote.WaifuVaultApi
 import com.waifuvault.mobile.data.remote.dto.*
 import com.waifuvault.mobile.domain.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 
-class FileRepository {
-
-    private val api = ApiClient.waifuVaultApi
+class FileRepository(
+    private val api: WaifuVaultApi = ApiClient.waifuVaultApi
+) {
 
     suspend fun uploadFile(
         file: File,
@@ -44,166 +46,15 @@ class FileRepository {
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!.toDomain())
             } else {
-                Result.failure(Exception("Upload failed: ${response.message()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun getFileInfo(token: String): Result<WaifuFile> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.getFileInfo(token)
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!.toDomain())
-            } else {
-                Result.failure(Exception("Failed to get file info: ${response.message()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun deleteFile(token: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.deleteFile(token)
-            if (response.isSuccessful) {
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception("Failed to delete file: ${response.message()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun downloadFile(
-        identifier: String,
-        password: String? = null,
-        destinationFile: File
-    ): Result<File> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.downloadFile(identifier, password)
-            if (response.isSuccessful && response.body() != null) {
-                response.body()!!.byteStream().use { input ->
-                    destinationFile.outputStream().use { output ->
-                        input.copyTo(output)
+                val errorMessage = try {
+                    response.errorBody()?.string()?.let { errorBody ->
+                        val errorResponse = Json.decodeFromString<ErrorResponse>(errorBody)
+                        errorResponse.message
                     }
+                } catch (_: Exception) {
+                    null
                 }
-                Result.success(destinationFile)
-            } else {
-                Result.failure(Exception("Failed to download file: ${response.message()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun modifyEntry(
-        token: String,
-        request: ModifyEntryRequest
-    ): Result<WaifuFile> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.modifyEntry(token, request)
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!.toDomain())
-            } else {
-                Result.failure(Exception("Failed to modify entry: ${response.message()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    // Bucket operations
-    suspend fun createBucket(): Result<WaifuBucket> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.createBucket()
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!.toDomain())
-            } else {
-                Result.failure(Exception("Failed to create bucket: ${response.message()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun getBucket(token: String): Result<WaifuBucket> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.getBucket(token)
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!.toDomain())
-            } else {
-                Result.failure(Exception("Failed to get bucket: ${response.message()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun deleteBucket(token: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.deleteBucket(token)
-            if (response.isSuccessful) {
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception("Failed to delete bucket: ${response.message()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    // Album operations
-    suspend fun createAlbum(name: String, bucketToken: String): Result<WaifuAlbum> =
-        withContext(Dispatchers.IO) {
-            try {
-                val response = api.createAlbum(CreateAlbumRequest(name, bucketToken))
-                if (response.isSuccessful && response.body() != null) {
-                    Result.success(response.body()!!.toDomain())
-                } else {
-                    Result.failure(Exception("Failed to create album: ${response.message()}"))
-                }
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
-        }
-
-    suspend fun getAlbum(token: String): Result<WaifuAlbum> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.getAlbum(token)
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!.toDomain())
-            } else {
-                Result.failure(Exception("Failed to get album: ${response.message()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun deleteAlbum(token: String, deleteFiles: Boolean = false): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            try {
-                val response = api.deleteAlbum(token, deleteFiles)
-                if (response.isSuccessful) {
-                    Result.success(Unit)
-                } else {
-                    Result.failure(Exception("Failed to delete album: ${response.message()}"))
-                }
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
-        }
-
-    suspend fun getRestrictions(): Result<Restrictions> = withContext(Dispatchers.IO) {
-        try {
-            val response = api.getRestrictions()
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!.toDomain())
-            } else {
-                Result.failure(Exception("Failed to get restrictions: ${response.message()}"))
+                Result.failure(Exception(errorMessage ?: "Upload failed: ${response.message()}"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -211,7 +62,6 @@ class FileRepository {
     }
 }
 
-// Extension functions to convert DTOs to domain models
 private fun WaifuFileDto.toDomain() = WaifuFile(
     token = token,
     url = url,
@@ -224,24 +74,4 @@ private fun WaifuFileDto.toDomain() = WaifuFile(
     bucket = bucket,
     id = id,
     views = views
-)
-
-private fun WaifuBucketDto.toDomain() = WaifuBucket(
-    token = token,
-    files = files.map { it.toDomain() }
-)
-
-private fun WaifuAlbumDto.toDomain() = WaifuAlbum(
-    token = token,
-    bucketToken = bucketToken,
-    publicToken = publicToken,
-    name = name,
-    files = files.map { it.toDomain() },
-    dateCreated = dateCreated
-)
-
-private fun RestrictionsDto.toDomain() = Restrictions(
-    maxFileSize = maxFileSize,
-    bannedMimeTypes = bannedMimeTypes,
-    retentionPeriods = retentionPeriods
 )

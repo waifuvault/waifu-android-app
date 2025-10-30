@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 
 object FileUtils {
 
@@ -47,27 +48,9 @@ object FileUtils {
     fun formatFileSize(bytes: Long): String {
         return when {
             bytes < 1024 -> "$bytes B"
-            bytes < 1024 * 1024 -> String.format("%.2f KB", bytes / 1024.0)
-            bytes < 1024 * 1024 * 1024 -> String.format("%.2f MB", bytes / (1024.0 * 1024.0))
-            else -> String.format("%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0))
-        }
-    }
-
-    fun getMimeType(fileName: String): String {
-        val extension = fileName.substringAfterLast('.', "")
-        return when (extension.lowercase()) {
-            "jpg", "jpeg" -> "image/jpeg"
-            "png" -> "image/png"
-            "gif" -> "image/gif"
-            "webp" -> "image/webp"
-            "mp4" -> "video/mp4"
-            "webm" -> "video/webm"
-            "mp3" -> "audio/mpeg"
-            "wav" -> "audio/wav"
-            "pdf" -> "application/pdf"
-            "zip" -> "application/zip"
-            "txt" -> "text/plain"
-            else -> "application/octet-stream"
+            bytes < 1024 * 1024 -> String.format(Locale.UK, "%.2f KB", bytes / 1024.0)
+            bytes < 1024 * 1024 * 1024 -> String.format(Locale.UK, "%.2f MB", bytes / (1024.0 * 1024.0))
+            else -> String.format(Locale.UK, "%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0))
         }
     }
 }

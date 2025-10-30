@@ -4,6 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.github.ben-manes.versions") version "0.53.0"
+    id("idea")
 }
 
 android {
@@ -59,6 +60,30 @@ android {
     }
 }
 
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion(kotlin.coreLibrariesVersion)
+            }
+        }
+    }
+}
+
+tasks.register("downloadSources") {
+    doLast {
+        configurations.all {
+            if (isCanBeResolved) {
+                resolvedConfiguration.resolvedArtifacts.forEach { artifact ->
+                    val id = artifact.moduleVersion.id
+                    println("Dependency: ${id.group}:${id.name}:${id.version}")
+                }
+            }
+        }
+        println("Run with: ./gradlew dependencies --configuration compileClasspath")
+    }
+}
+
 dependencies {
     // Core Android
     implementation("androidx.core:core-ktx:1.17.0")
@@ -107,7 +132,12 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.11.0")
 
     // Testing
-    testImplementation("junit:junit:4.13.2")
+    testImplementation("io.mockk:mockk:1.14.6")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("app.cash.turbine:turbine:1.2.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.2.1")
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
+
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation(platform("androidx.compose:compose-bom:2025.10.01"))

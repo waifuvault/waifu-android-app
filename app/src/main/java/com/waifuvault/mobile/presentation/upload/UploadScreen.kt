@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,51 +18,53 @@ import com.waifuvault.mobile.domain.model.UploadState
 import com.waifuvault.mobile.util.FileUtils
 import java.io.File
 
+data class SelectedFile(
+    val uri: Uri,
+    val name: String,
+    val size: Long
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UploadScreen(
-    viewModel: UploadViewModel,
-    onNavigateToFileList: () -> Unit
+    viewModel: UploadViewModel
 ) {
     val context = LocalContext.current
     val uploadState by viewModel.uploadState.collectAsState()
     val uploadOptions by viewModel.uploadOptions.collectAsState()
 
-    var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedFileName by remember { mutableStateOf<String?>(null) }
-    var selectedFileSize by remember { mutableLongStateOf(0L) }
+    var selectedFiles by remember { mutableStateOf<List<SelectedFile>>(emptyList()) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            selectedFileUri = it
-            selectedFileName = FileUtils.getFileName(context, it)
-            selectedFileSize = FileUtils.getFileSize(context, it)
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        selectedFiles = uris.map { uri ->
+            SelectedFile(
+                uri = uri,
+                name = FileUtils.getFileName(context, uri) ?: "Unknown",
+                size = FileUtils.getFileSize(context, uri)
+            )
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("WaifuVault") },
-                actions = {
-                    IconButton(onClick = onNavigateToFileList) {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "View Files")
-                    }
-                }
+                title = { Text("WaifuVault") }
             )
         },
         floatingActionButton = {
-            if (selectedFileUri != null && uploadState !is UploadState.Uploading) {
+            if (selectedFiles.isNotEmpty() && uploadState !is UploadState.Uploading && uploadState !is UploadState.UploadingMultiple) {
                 FloatingActionButton(
                     onClick = {
-                        selectedFileUri?.let { uri ->
-                            val tempFile = File(context.cacheDir, selectedFileName ?: "temp_file")
-                            if (FileUtils.copyUriToFile(context, uri, tempFile)) {
-                                viewModel.uploadFile(tempFile)
-                            }
+                        val filesToUpload = selectedFiles.mapIndexedNotNull { index, selectedFile ->
+                            val uniqueName = "${System.currentTimeMillis()}_${index}_${selectedFile.name}"
+                            val tempFile = File(context.cacheDir, uniqueName)
+                            if (FileUtils.copyUriToFile(context, selectedFile.uri, tempFile)) {
+                                tempFile
+                            } else null
                         }
+                        viewModel.uploadFiles(filesToUpload)
                     }
                 ) {
                     Icon(Icons.Default.CloudUpload, contentDescription = "Upload")
@@ -86,7 +87,7 @@ fun UploadScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Select File", style = MaterialTheme.typography.titleMedium)
+                    Text("Select Files", style = MaterialTheme.typography.titleMedium)
 
                     Button(
                         onClick = { filePickerLauncher.launch("*/*") },
@@ -94,13 +95,34 @@ fun UploadScreen(
                     ) {
                         Icon(Icons.Default.AttachFile, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Choose File")
+                        Text("Choose Files")
                     }
 
-                    if (selectedFileName != null) {
+                    if (selectedFiles.isNotEmpty()) {
                         HorizontalDivider()
-                        Text("Selected: $selectedFileName")
-                        Text("Size: ${FileUtils.formatFileSize(selectedFileSize)}")
+                        Text("Selected ${selectedFiles.size} file(s):",
+                            style = MaterialTheme.typography.labelMedium)
+                        selectedFiles.forEach { file ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(file.name, style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        FileUtils.formatFileSize(file.size),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(onClick = {
+                                    selectedFiles = selectedFiles.filter { it != file }
+                                }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove")
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -127,6 +149,20 @@ fun UploadScreen(
                     }
                 }
 
+                is UploadState.UploadingMultiple -> {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Uploading Files", style = MaterialTheme.typography.titleMedium)
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            state.files.forEach { fileProgress ->
+                                FileUploadProgressItem(fileProgress)
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
+
                 is UploadState.Processing -> {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(
@@ -141,7 +177,10 @@ fun UploadScreen(
                 }
 
                 is UploadState.Success -> {
-                    UploadSuccessCard(file = state.file, onDismiss = { viewModel.resetUploadState() })
+                    UploadSuccessCard(
+                        files = state.allFiles,
+                        onDismiss = { viewModel.resetUploadState() }
+                    )
                 }
 
                 is UploadState.Error -> {
@@ -243,7 +282,49 @@ fun UploadOptionsCard(
 }
 
 @Composable
-fun UploadSuccessCard(file: com.waifuvault.mobile.domain.model.WaifuFile, onDismiss: () -> Unit) {
+fun FileUploadProgressItem(progress: com.waifuvault.mobile.domain.model.FileUploadProgress) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(progress.fileName, style = MaterialTheme.typography.bodyMedium)
+            when (val status = progress.status) {
+                is com.waifuvault.mobile.domain.model.FileUploadStatus.Pending -> {
+                    Text("Waiting...", style = MaterialTheme.typography.bodySmall)
+                }
+                is com.waifuvault.mobile.domain.model.FileUploadStatus.Uploading -> {
+                    Text("Uploading...", style = MaterialTheme.typography.bodySmall)
+                }
+                is com.waifuvault.mobile.domain.model.FileUploadStatus.Success -> {
+                    Text("Complete", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                }
+                is com.waifuvault.mobile.domain.model.FileUploadStatus.Error -> {
+                    Text("Error: ${status.message}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+
+        when (progress.status) {
+            is com.waifuvault.mobile.domain.model.FileUploadStatus.Pending -> {
+                Icon(Icons.Default.Schedule, contentDescription = "Pending", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            is com.waifuvault.mobile.domain.model.FileUploadStatus.Uploading -> {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+            }
+            is com.waifuvault.mobile.domain.model.FileUploadStatus.Success -> {
+                Icon(Icons.Default.CheckCircle, contentDescription = "Success", tint = MaterialTheme.colorScheme.primary)
+            }
+            is com.waifuvault.mobile.domain.model.FileUploadStatus.Error -> {
+                Icon(Icons.Default.Error, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
+fun UploadSuccessCard(files: List<com.waifuvault.mobile.domain.model.WaifuFile>, onDismiss: () -> Unit) {
     val context = LocalContext.current
 
     Card(
@@ -256,48 +337,57 @@ fun UploadSuccessCard(file: com.waifuvault.mobile.domain.model.WaifuFile, onDism
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.CheckCircle, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Upload Successful!", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (files.size == 1) "Upload Successful!" else "Uploaded ${files.size} files!",
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("URL: ${file.url}", style = MaterialTheme.typography.bodySmall)
-            Text("Token: ${file.token}", style = MaterialTheme.typography.bodySmall)
+            files.forEach { file ->
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Text("URL: ${file.url}", style = MaterialTheme.typography.bodySmall)
+                    Text("Token: ${file.token}", style = MaterialTheme.typography.bodySmall)
 
-            Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                                        as android.content.ClipboardManager
+                                val clip = android.content.ClipData.newPlainText("WaifuVault URL", file.url)
+                                clipboard.setPrimaryClip(clip)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Copy")
+                        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = {
-                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                                as android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("WaifuVault URL", file.url)
-                        clipboard.setPrimaryClip(clip)
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Copy URL")
+                        Button(
+                            onClick = {
+                                val shareIntent = android.content.Intent().apply {
+                                    action = android.content.Intent.ACTION_SEND
+                                    putExtra(android.content.Intent.EXTRA_TEXT, file.url)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share via"))
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Share")
+                        }
+                    }
                 }
 
-                Button(
-                    onClick = {
-                        val shareIntent = android.content.Intent().apply {
-                            action = android.content.Intent.ACTION_SEND
-                            putExtra(android.content.Intent.EXTRA_TEXT, file.url)
-                            type = "text/plain"
-                        }
-                        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share via"))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Share, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Share")
+                if (file != files.last()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 }
             }
 

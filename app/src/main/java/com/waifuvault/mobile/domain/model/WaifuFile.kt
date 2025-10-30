@@ -17,29 +17,9 @@ data class FileOptions(
 )
 
 data class FileUploadOptions(
-    val expires: String? = null,          // "1h", "30m", "2d"
+    val expires: String? = null,
     val hideFilename: Boolean = false,
     val password: String? = null,
     val oneTimeDownload: Boolean = false,
     val bucketToken: String? = null
-)
-
-data class WaifuBucket(
-    val token: String,
-    val files: List<WaifuFile> = emptyList()
-)
-
-data class WaifuAlbum(
-    val token: String,
-    val bucketToken: String,
-    val publicToken: String? = null,
-    val name: String,
-    val files: List<WaifuFile> = emptyList(),
-    val dateCreated: Long
-)
-
-data class Restrictions(
-    val maxFileSize: Long,
-    val bannedMimeTypes: List<String> = emptyList(),
-    val retentionPeriods: List<String> = emptyList()
 )
