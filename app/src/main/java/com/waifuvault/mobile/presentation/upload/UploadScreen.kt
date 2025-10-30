@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -48,7 +49,7 @@ fun UploadScreen(
                 title = { Text("WaifuVault") },
                 actions = {
                     IconButton(onClick = onNavigateToFileList) {
-                        Icon(Icons.Default.List, contentDescription = "View Files")
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "View Files")
                     }
                 }
             )
@@ -97,7 +98,7 @@ fun UploadScreen(
                     }
 
                     if (selectedFileName != null) {
-                        Divider()
+                        HorizontalDivider()
                         Text("Selected: $selectedFileName")
                         Text("Size: ${FileUtils.formatFileSize(selectedFileSize)}")
                     }

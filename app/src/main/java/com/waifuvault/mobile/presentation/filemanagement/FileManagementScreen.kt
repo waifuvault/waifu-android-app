@@ -189,7 +189,7 @@ fun FileItem(
             }
 
             if (expanded) {
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                 Text("URL:", style = MaterialTheme.typography.labelMedium)
                 Text(file.url, style = MaterialTheme.typography.bodySmall)
