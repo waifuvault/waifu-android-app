@@ -101,13 +101,6 @@ From any app with file sharing:
 3. File will be uploaded automatically
 4. Share the generated URL
 
-### Manage Files
-
-1. Tap the list icon to view all uploaded files
-2. Tap a file to expand details
-3. Copy URL or share directly
-4. Delete files you no longer need
-
 ## Network Optimization
 
 The app automatically adjusts upload chunk sizes based on network type:
