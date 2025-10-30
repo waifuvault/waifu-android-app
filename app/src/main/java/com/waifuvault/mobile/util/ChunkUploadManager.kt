@@ -31,24 +31,15 @@ class ChunkUploadManager(
         try {
             val fileSize = file.length()
 
-            // If file is smaller than chunk size, upload directly
             if (fileSize <= chunkSize) {
                 val result = repository.uploadFile(file, options)
                 emit(result)
                 return@flow
             }
 
-            // Create chunks
             val chunks = createChunks(file)
             val totalChunks = chunks.size
 
-            // For now, we'll upload the whole file at once
-            // In a production app, you would implement the chunking logic
-            // similar to your Next.js implementation with temporary files
-            // and a finalize endpoint
-
-            // Since WaifuVault API doesn't natively support chunked uploads,
-            // we upload the complete file in one request
             val result = repository.uploadFile(file, options)
             emit(result)
 
