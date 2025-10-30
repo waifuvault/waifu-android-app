@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WaifuVault</string>
+    <string name="upload_file">Upload File</string>
+    <string name="my_files">My Files</string>
+    <string name="upload_success">Upload successful!</string>
+    <string name="upload_failed">Upload failed</string>
+    <string name="delete_file">Delete File</string>
+    <string name="share_file">Share File</string>
+    <string name="copy_url">Copy URL</string>
+    <string name="password_protected">Password Protected</string>
+    <string name="one_time_download">One-Time Download</string>
+    <string name="hide_filename">Hide Filename</string>
+    <string name="expiry">Expiry</string>
+    <string name="choose_file">Choose File</string>
+    <string name="uploading">Uploading...</string>
+    <string name="processing">Processing upload...</string>
+</resources>
