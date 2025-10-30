@@ -1,6 +1,6 @@
 # WaifuVault Android App
 
-Native Android application for uploading and sharing files using the WaifuVault API.
+Native Android application for uploading files using the WaifuVault API.
 
 ## Features
 
@@ -9,11 +9,9 @@ Native Android application for uploading and sharing files using the WaifuVault 
     - One-time download
     - Hidden filenames
     - Custom expiry times
-- **File Management**: View, share, and delete uploaded files
 - **Native Android Integration**:
-    - Share Sheet support (upload files from other apps)
     - Material Design 3 UI with Jetpack Compose
-    - Adaptive chunk sizes based on network type
+    - Modern Android architecture
 
 ## Architecture
 
@@ -22,7 +20,7 @@ The app follows Clean Architecture principles with MVVM pattern:
 ```
 presentation/    - UI layer (Jetpack Compose + ViewModels)
 domain/          - Business logic (Models, Use Cases)
-data/            - Data layer (API, Repository, Local Storage)
+data/            - Data layer (API, Repository)
 util/            - Utility classes
 ```
 
@@ -37,67 +35,42 @@ util/            - Utility classes
 
 ### Steps
 
-1. Open the `/android` folder in Android Studio
+1. Open the project in Android Studio
 2. Sync Gradle files
 3. Build and run on emulator or device
 
 ### Gradle Build
 
 ```bash
-cd android
 ./gradlew assembleDebug
 ```
-
-## Configuration
 
 ## API Integration
 
 The app communicates directly with the WaifuVault REST API:
 
 - **Base URL**: `https://waifuvault.moe`
-- **No proxy required**: Direct API calls from mobile
-- **Authentication**: Token-based (bucket token)
+- **Direct API calls**: No proxy required
 
 ### Supported Operations
 
-- Upload files with options
-- Get file information
-- Delete files
-- Modify file properties
-- Create and manage buckets
-- Album support (future feature)
+- Upload files with configurable options (password, expiry, hide filename, one-time download)
 
 ## Usage
 
 ### Upload a File
 
-1. Tap "Choose File" on the upload screen
-2. Select a file from your device
-3. Configure upload options (optional):
+1. Launch the app
+2. Tap "Choose File" on the upload screen
+3. Select a file from your device
+4. Configure upload options (optional):
     - Set password protection
     - Enable one-time download
     - Hide filename
-    - Set expiry time
-4. Tap the upload button
-5. Copy or share the generated URL
-
-### Share Files to WaifuVault
-
-From any app with file sharing:
-
-1. Tap "Share"
-2. Select "WaifuVault"
-3. File will be uploaded automatically
-4. Share the generated URL
-
-## Network Optimization
-
-The app automatically adjusts upload chunk sizes based on network type:
-
-- **WiFi/Ethernet**: 10 MB chunks
-- **Cellular**: 5 MB chunks
-- **Slow 4G**: 2 MB chunks
+    - Set expiry time (e.g., "1h", "30m", "2d")
+5. Tap the upload button
+6. Copy the generated URL to share your file
 
 ## License
 
-Same as the parent WaifuFiles project.
+Same as the parent WaifuVault project.

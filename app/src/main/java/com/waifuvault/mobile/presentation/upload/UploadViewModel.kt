@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.waifuvault.mobile.data.repository.FileRepository
 import com.waifuvault.mobile.domain.model.FileUploadOptions
+import com.waifuvault.mobile.domain.model.FileUploadProgress
+import com.waifuvault.mobile.domain.model.FileUploadStatus
 import com.waifuvault.mobile.domain.model.UploadState
+import com.waifuvault.mobile.domain.model.WaifuFile
 import com.waifuvault.mobile.domain.usecase.UploadFileUseCase
-import com.waifuvault.mobile.util.ChunkUploadManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,11 +16,10 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class UploadViewModel(
-    private val repository: FileRepository
+    repository: FileRepository
 ) : ViewModel() {
 
-    private val chunkUploadManager = ChunkUploadManager(repository)
-    private val uploadFileUseCase = UploadFileUseCase(repository, chunkUploadManager)
+    private val uploadFileUseCase = UploadFileUseCase(repository)
 
     private val _uploadState = MutableStateFlow<UploadState>(UploadState.Idle)
     val uploadState: StateFlow<UploadState> = _uploadState.asStateFlow()
@@ -34,26 +35,97 @@ class UploadViewModel(
     val uploadOptions: StateFlow<UploadOptions> = _uploadOptions.asStateFlow()
 
     fun uploadFile(file: File) {
+        uploadFiles(listOf(file))
+    }
+
+    fun uploadFiles(files: List<File>) {
+        if (files.isEmpty()) return
+
         viewModelScope.launch {
-            _uploadState.value = UploadState.Uploading(0, 0, 1)
+            if (files.size == 1) {
+                _uploadState.value = UploadState.Uploading(0)
+            } else {
+                val initialProgress = files.map { file ->
+                    FileUploadProgress(
+                        fileName = file.name,
+                        status = FileUploadStatus.Pending
+                    )
+                }
+                _uploadState.value = UploadState.UploadingMultiple(initialProgress)
+            }
 
             val options = FileUploadOptions(
                 expires = _uploadOptions.value.expires,
                 hideFilename = _uploadOptions.value.hideFilename,
                 password = _uploadOptions.value.password,
                 oneTimeDownload = _uploadOptions.value.oneTimeDownload,
-                bucketToken = null  // No bucket token needed
+                bucketToken = null
             )
 
-            val result = uploadFileUseCase.uploadDirect(file, options)
+            val uploadedFiles = mutableListOf<WaifuFile>()
+            val errors = mutableListOf<String>()
 
-            _uploadState.value = if (result.isSuccess) {
-                UploadState.Success(result.getOrNull()!!)
-            } else {
-                UploadState.Error(
-                    result.exceptionOrNull()?.message ?: "Unknown error",
-                    result.exceptionOrNull() as? Exception
-                )
+            files.forEachIndexed { index, file ->
+                if (files.size == 1) {
+                    val progress = ((index + 1) * 100 / files.size)
+                    _uploadState.value = UploadState.Uploading(progress)
+                } else {
+                    val currentState = _uploadState.value
+                    if (currentState is UploadState.UploadingMultiple) {
+                        val updatedProgress = currentState.files.toMutableList()
+                        updatedProgress[index] = updatedProgress[index].copy(
+                            status = FileUploadStatus.Uploading
+                        )
+                        _uploadState.value = UploadState.UploadingMultiple(updatedProgress)
+                    }
+                }
+
+                val result = uploadFileUseCase.uploadDirect(file, options)
+
+                if (result.isSuccess) {
+                    val waifuFile = result.getOrNull()!!
+                    uploadedFiles.add(waifuFile)
+
+                    if (files.size > 1) {
+                        val currentState = _uploadState.value
+                        if (currentState is UploadState.UploadingMultiple) {
+                            val updatedProgress = currentState.files.toMutableList()
+                            updatedProgress[index] = updatedProgress[index].copy(
+                                status = FileUploadStatus.Success(waifuFile)
+                            )
+                            _uploadState.value = UploadState.UploadingMultiple(updatedProgress)
+                        }
+                    }
+                } else {
+                    val errorMessage = result.exceptionOrNull()?.message
+                    errors.add("${file.name}: $errorMessage")
+
+                    if (files.size > 1) {
+                        val currentState = _uploadState.value
+                        if (currentState is UploadState.UploadingMultiple) {
+                            val updatedProgress = currentState.files.toMutableList()
+                            updatedProgress[index] = updatedProgress[index].copy(
+                                status = FileUploadStatus.Error(errorMessage ?: "Unknown error")
+                            )
+                            _uploadState.value = UploadState.UploadingMultiple(updatedProgress)
+                        }
+                    }
+                }
+            }
+
+            _uploadState.value = when {
+                errors.isEmpty() && uploadedFiles.isNotEmpty() -> {
+                    UploadState.Success(uploadedFiles.first(), uploadedFiles)
+                }
+                uploadedFiles.isEmpty() -> {
+                    UploadState.Error(
+                        errors.joinToString("\n"),
+                        Exception(errors.firstOrNull())
+                    )
+                }
+                else -> {
+                    UploadState.Success(uploadedFiles.first(), uploadedFiles)
+                }
             }
         }
     }
