@@ -14,7 +14,6 @@ Native Android application for uploading and sharing files using the WaifuVault 
     - Share Sheet support (upload files from other apps)
     - Material Design 3 UI with Jetpack Compose
     - Adaptive chunk sizes based on network type
-- **Secure**: Bucket token stored using DataStore
 
 ## Architecture
 
@@ -50,16 +49,6 @@ cd android
 ```
 
 ## Configuration
-
-### Bucket Token Setup
-
-On first launch:
-
-1. Tap the settings icon in the upload screen
-2. Enter your WaifuVault bucket token
-3. Token is securely stored using DataStore
-
-You can create a bucket token via the WaifuVault API or use an existing one from your web app.
 
 ## API Integration
 
