@@ -28,14 +28,17 @@
 -keepclasseswithmembers class kotlinx.serialization.json.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
--keep,includedescriptorclasses class com.waifuvault.mobile.**$$serializer { *; }
--keepclassmembers class com.waifuvault.mobile.** {
+-keep,includedescriptorclasses class moe.waifuvault.mobile.**$$serializer { *; }
+-keepclassmembers class moe.waifuvault.mobile.** {
     *** Companion;
 }
--keepclasseswithmembers class com.waifuvault.mobile.** {
+-keepclasseswithmembers class moe.waifuvault.mobile.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
 
 # Keep data classes
--keep class com.waifuvault.mobile.data.remote.dto.** { *; }
--keep class com.waifuvault.mobile.domain.model.** { *; }
+-keep class moe.waifuvault.mobile.data.remote.dto.** { *; }
+-keep class moe.waifuvault.mobile.domain.model.** { *; }
+
+# Suppress R8 warning about kotlinx-serialization's unusual type patterns
+-dontwarn **$*

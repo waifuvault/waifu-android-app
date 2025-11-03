@@ -16,14 +16,14 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.waifuvault.mobile"
+    namespace = "moe.waifuvault.mobile"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.waifuvault.mobile"
+        applicationId = "moe.waifuvault.mobile"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
+        versionCode = 2
         versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
