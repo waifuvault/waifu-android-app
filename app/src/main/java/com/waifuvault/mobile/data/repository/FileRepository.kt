@@ -44,7 +44,7 @@ class FileRepository(
             )
 
             if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!.toDomain())
+                Result.success(response.body()!!.toDomain(file.name))
             } else {
                 val errorMessage = try {
                     response.errorBody()?.string()?.let { errorBody ->
@@ -62,7 +62,7 @@ class FileRepository(
     }
 }
 
-private fun WaifuFileDto.toDomain() = WaifuFile(
+private fun WaifuFileDto.toDomain(fileName: String) = WaifuFile(
     token = token,
     url = url,
     options = FileOptions(
@@ -73,5 +73,6 @@ private fun WaifuFileDto.toDomain() = WaifuFile(
     retentionPeriod = retentionPeriod,
     bucket = bucket,
     id = id,
-    views = views
+    views = views,
+    fileName = fileName
 )

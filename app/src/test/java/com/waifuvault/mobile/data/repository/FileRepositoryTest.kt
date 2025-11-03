@@ -81,6 +81,8 @@ class FileRepositoryTest {
         assertEquals("https://waifuvault.moe/f/test.jpg", waifuFile?.url)
         assertEquals("1h", waifuFile?.retentionPeriod)
         assertTrue(waifuFile?.options?.hideFilename ?: false)
+        assertNotNull(waifuFile?.fileName)
+        assertTrue(waifuFile?.fileName?.contains(".jpg") ?: false)
     }
 
     @Test
@@ -155,5 +157,6 @@ class FileRepositoryTest {
         assertEquals("simple-token", waifuFile?.token)
         assertFalse(waifuFile?.options?.hideFilename ?: true)
         assertFalse(waifuFile?.options?.oneTimeDownload ?: true)
+        assertNotNull(waifuFile?.fileName)
     }
 }

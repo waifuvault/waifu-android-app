@@ -7,7 +7,8 @@ data class WaifuFile(
     val retentionPeriod: String,
     val bucket: String? = null,
     val id: Int? = null,
-    val views: Int? = null
+    val views: Int? = null,
+    val fileName: String? = null
 )
 
 data class FileOptions(

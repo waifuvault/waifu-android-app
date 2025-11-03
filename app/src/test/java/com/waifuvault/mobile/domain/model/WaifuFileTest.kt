@@ -20,7 +20,8 @@ class WaifuFileTest {
             retentionPeriod = "1h",
             bucket = "bucket-123",
             id = 456,
-            views = 10
+            views = 10,
+            fileName = "test-file.jpg"
         )
 
         assertEquals("test-token-123", waifuFile.token)
@@ -29,6 +30,7 @@ class WaifuFileTest {
         assertEquals("bucket-123", waifuFile.bucket)
         assertEquals(456, waifuFile.id)
         assertEquals(10, waifuFile.views)
+        assertEquals("test-file.jpg", waifuFile.fileName)
         assertTrue(waifuFile.options.hideFilename)
         assertTrue(waifuFile.options.oneTimeDownload)
         assertTrue(waifuFile.options.protected)
@@ -51,9 +53,23 @@ class WaifuFileTest {
         assertNull(waifuFile.bucket)
         assertNull(waifuFile.id)
         assertNull(waifuFile.views)
+        assertNull(waifuFile.fileName)
         assertFalse(waifuFile.options.hideFilename)
         assertFalse(waifuFile.options.oneTimeDownload)
         assertFalse(waifuFile.options.protected)
+    }
+
+    @Test
+    fun `WaifuFile with fileName field`() {
+        val waifuFile = WaifuFile(
+            token = "test-token",
+            url = "https://waifuvault.moe/f/file.png",
+            options = FileOptions(),
+            retentionPeriod = "30m",
+            fileName = "my-document.pdf"
+        )
+
+        assertEquals("my-document.pdf", waifuFile.fileName)
     }
 
     @Test

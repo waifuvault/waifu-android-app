@@ -70,7 +70,8 @@ class UploadViewModelTest {
             token = "token123",
             url = "https://waifuvault.moe/f/file.jpg",
             options = FileOptions(),
-            retentionPeriod = "1h"
+            retentionPeriod = "1h",
+            fileName = testFile.name
         )
 
         coEvery {
@@ -127,7 +128,8 @@ class UploadViewModelTest {
             token = "token",
             url = "url",
             options = FileOptions(),
-            retentionPeriod = "2d"
+            retentionPeriod = "2d",
+            fileName = testFile.name
         )
 
         coEvery {
@@ -172,7 +174,8 @@ class UploadViewModelTest {
             token = "token",
             url = "url",
             options = FileOptions(),
-            retentionPeriod = "1h"
+            retentionPeriod = "1h",
+            fileName = testFile.name
         )
 
         coEvery {
@@ -217,7 +220,8 @@ class UploadViewModelTest {
             token = "token",
             url = "url",
             options = FileOptions(),
-            retentionPeriod = "1h"
+            retentionPeriod = "1h",
+            fileName = testFile.name
         )
 
         coEvery {
@@ -246,19 +250,22 @@ class UploadViewModelTest {
             token = "token1",
             url = "https://waifuvault.moe/f/file1.jpg",
             options = FileOptions(),
-            retentionPeriod = "1h"
+            retentionPeriod = "1h",
+            fileName = testFile.name
         )
         val waifuFile2 = WaifuFile(
             token = "token2",
             url = "https://waifuvault.moe/f/file2.png",
             options = FileOptions(),
-            retentionPeriod = "1h"
+            retentionPeriod = "1h",
+            fileName = testFile2.name
         )
         val waifuFile3 = WaifuFile(
             token = "token3",
             url = "https://waifuvault.moe/f/file3.gif",
             options = FileOptions(),
-            retentionPeriod = "1h"
+            retentionPeriod = "1h",
+            fileName = testFile3.name
         )
 
         coEvery {
@@ -303,7 +310,8 @@ class UploadViewModelTest {
             token = "token1",
             url = "https://waifuvault.moe/f/file1.jpg",
             options = FileOptions(),
-            retentionPeriod = "1h"
+            retentionPeriod = "1h",
+            fileName = testFile.name
         )
 
         coEvery {
@@ -364,5 +372,83 @@ class UploadViewModelTest {
         }
 
         testFile2.delete()
+    }
+
+    @Test
+    fun `uploadFiles with cleanup flag cleans up temp files after success`() = runTest(testDispatcher) {
+        // Create a file in a cache-like directory to simulate real usage
+        val cacheDir = File(System.getProperty("java.io.tmpdir"), "cache")
+        cacheDir.mkdirs()
+        val tempFile = File(cacheDir, "temp_upload.jpg")
+        tempFile.writeText("temporary content")
+        assertTrue(tempFile.exists())
+
+        val waifuFile = WaifuFile(
+            token = "token",
+            url = "https://waifuvault.moe/f/file.jpg",
+            options = FileOptions(),
+            retentionPeriod = "1h",
+            fileName = tempFile.name
+        )
+
+        coEvery {
+            repository.uploadFile(tempFile, any())
+        } returns Result.success(waifuFile)
+
+        viewModel.uploadFiles(listOf(tempFile), shouldCleanup = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify the file is deleted after upload completes
+        assertFalse(tempFile.exists())
+        cacheDir.delete()
+    }
+
+    @Test
+    fun `uploadFiles with cleanup flag cleans up temp files after error`() = runTest(testDispatcher) {
+        // Create a file in a cache-like directory to simulate real usage
+        val cacheDir = File(System.getProperty("java.io.tmpdir"), "cache")
+        cacheDir.mkdirs()
+        val tempFile = File(cacheDir, "temp_upload_error.jpg")
+        tempFile.writeText("temporary content")
+        assertTrue(tempFile.exists())
+
+        coEvery {
+            repository.uploadFile(tempFile, any())
+        } returns Result.failure(Exception("Upload failed"))
+
+        viewModel.uploadFiles(listOf(tempFile), shouldCleanup = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify the file is deleted even after upload fails
+        assertFalse(tempFile.exists())
+        cacheDir.delete()
+    }
+
+    @Test
+    fun `uploadFiles without cleanup flag does not delete temp files`() = runTest(testDispatcher) {
+        val tempFile = File.createTempFile("temp_upload", ".jpg")
+        tempFile.writeText("temporary content")
+        assertTrue(tempFile.exists())
+
+        val waifuFile = WaifuFile(
+            token = "token",
+            url = "https://waifuvault.moe/f/file.jpg",
+            options = FileOptions(),
+            retentionPeriod = "1h",
+            fileName = tempFile.name
+        )
+
+        coEvery {
+            repository.uploadFile(tempFile, any())
+        } returns Result.success(waifuFile)
+
+        viewModel.uploadFiles(listOf(tempFile), shouldCleanup = false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify the file still exists when cleanup is disabled
+        assertTrue(tempFile.exists())
+
+        // Clean up manually for test cleanup
+        tempFile.delete()
     }
 }

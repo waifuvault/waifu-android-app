@@ -64,7 +64,7 @@ fun UploadScreen(
                                 tempFile
                             } else null
                         }
-                        viewModel.uploadFiles(filesToUpload)
+                        viewModel.uploadFiles(filesToUpload, shouldCleanup = true)
                     }
                 ) {
                     Icon(Icons.Default.CloudUpload, contentDescription = "Upload")
@@ -347,6 +347,16 @@ fun UploadSuccessCard(files: List<com.waifuvault.mobile.domain.model.WaifuFile>,
 
             files.forEach { file ->
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    // Display filename prominently
+                    file.fileName?.let { fileName ->
+                        Text(
+                            fileName,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
                     Text("URL: ${file.url}", style = MaterialTheme.typography.bodySmall)
                     Text("Token: ${file.token}", style = MaterialTheme.typography.bodySmall)
 

@@ -34,11 +34,16 @@ class UploadViewModel(
     )
     val uploadOptions: StateFlow<UploadOptions> = _uploadOptions.asStateFlow()
 
+    private var tempFilesToCleanup = mutableListOf<File>()
+
     fun uploadFile(file: File) {
         uploadFiles(listOf(file))
     }
 
-    fun uploadFiles(files: List<File>) {
+    fun uploadFiles(files: List<File>, shouldCleanup: Boolean = false) {
+        if (shouldCleanup) {
+            tempFilesToCleanup.addAll(files)
+        }
         if (files.isEmpty()) return
 
         viewModelScope.launch {
@@ -127,7 +132,21 @@ class UploadViewModel(
                     UploadState.Success(uploadedFiles.first(), uploadedFiles)
                 }
             }
+            cleanupTempFiles()
         }
+    }
+
+    private fun cleanupTempFiles() {
+        tempFilesToCleanup.forEach { file ->
+            try {
+                if (file.exists() && file.absolutePath.contains("cache")) {
+                    file.delete()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        tempFilesToCleanup.clear()
     }
 
     fun updateUploadOptions(options: UploadOptions) {
