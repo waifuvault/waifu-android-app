@@ -8,6 +8,9 @@ import retrofit2.http.*
 
 interface WaifuVaultApi {
 
+    @GET("/rest/resources/restrictions")
+    suspend fun getRestrictions(): Response<List<RestrictionDto>>
+
     @Multipart
     @PUT("/rest")
     suspend fun uploadFile(

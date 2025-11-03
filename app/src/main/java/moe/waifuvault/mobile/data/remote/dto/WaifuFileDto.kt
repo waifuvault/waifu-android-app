@@ -26,3 +26,9 @@ data class ErrorResponse(
     val message: String,
     val status: Int
 )
+
+@Serializable
+data class RestrictionDto(
+    val type: String,
+    val value: String
+)

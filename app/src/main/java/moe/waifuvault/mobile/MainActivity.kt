@@ -22,12 +22,15 @@ import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
     private var sharedFiles: List<File>? = null
+    private var sharedFilesMimeTypes: Map<String, String?> = emptyMap()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Handle shared files from intent
-        sharedFiles = handleSharedIntent(intent)
+        val (files, mimeTypes) = handleSharedIntent(intent)
+        sharedFiles = files
+        sharedFilesMimeTypes = mimeTypes
 
         setContent {
             WaifuVaultTheme {
@@ -35,7 +38,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    WaifuVaultApp(sharedFiles)
+                    WaifuVaultApp(sharedFiles, sharedFilesMimeTypes)
                 }
             }
         }
@@ -45,11 +48,15 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
 
-        sharedFiles = handleSharedIntent(intent)
+        val (files, mimeTypes) = handleSharedIntent(intent)
+        sharedFiles = files
+        sharedFilesMimeTypes = mimeTypes
     }
 
-    private fun handleSharedIntent(intent: Intent): List<File>? {
-        return when (intent.action) {
+    private fun handleSharedIntent(intent: Intent): Pair<List<File>?, Map<String, String?>> {
+        val mimeTypesMap = mutableMapOf<String, String?>()
+
+        val files = when (intent.action) {
             Intent.ACTION_SEND -> {
                 // Handle single file
                 val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -58,7 +65,14 @@ class MainActivity : ComponentActivity() {
                     @Suppress("DEPRECATION")
                     intent.getParcelableExtra(Intent.EXTRA_STREAM)
                 }
-                uri?.let { listOfNotNull(copyUriToFile(it)) }
+                uri?.let {
+                    val mimeType = contentResolver.getType(it)
+                    val file = copyUriToFile(it)
+                    if (file != null) {
+                        mimeTypesMap[file.name] = mimeType
+                    }
+                    listOfNotNull(file)
+                }
             }
             Intent.ACTION_SEND_MULTIPLE -> {
                 // Handle multiple files
@@ -68,10 +82,19 @@ class MainActivity : ComponentActivity() {
                     @Suppress("DEPRECATION")
                     intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
                 }
-                uris?.mapNotNull { uri -> copyUriToFile(uri) }
+                uris?.mapNotNull { uri ->
+                    val mimeType = contentResolver.getType(uri)
+                    val file = copyUriToFile(uri)
+                    if (file != null) {
+                        mimeTypesMap[file.name] = mimeType
+                    }
+                    file
+                }
             }
             else -> null
         }
+
+        return Pair(files, mimeTypesMap)
     }
 
     private fun copyUriToFile(uri: Uri): File? {
@@ -102,7 +125,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun WaifuVaultApp(sharedFiles: List<File>? = null) {
+fun WaifuVaultApp(sharedFiles: List<File>? = null, mimeTypes: Map<String, String?> = emptyMap()) {
     val viewModel: UploadViewModel = viewModel(
         factory = UploadViewModelFactory(FileRepository())
     )
@@ -111,7 +134,21 @@ fun WaifuVaultApp(sharedFiles: List<File>? = null) {
     LaunchedEffect(sharedFiles) {
         sharedFiles?.let { files ->
             if (files.isNotEmpty()) {
-                viewModel.uploadFiles(files, shouldCleanup = true)
+                // Validate shared files before uploading
+                val filesToValidate = files.map { it.name to it.length() }
+                val validationResult = viewModel.validateFilesForSelection(filesToValidate, mimeTypes)
+
+                // Only upload valid files
+                val validFiles = files.filter { file ->
+                    validationResult.validFiles.any { it.first == file.name }
+                }
+
+                if (validFiles.isNotEmpty()) {
+                    viewModel.uploadFiles(validFiles, shouldCleanup = true)
+                } else if (validationResult.invalidFiles.isNotEmpty()) {
+                    // All files were invalid, show error
+                    viewModel.showValidationError(validationResult.invalidFiles.joinToString("\n") { "• $it" })
+                }
             }
         }
     }

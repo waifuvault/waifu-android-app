@@ -110,12 +110,12 @@ try {
     }
 
     // Update build.gradle.kts
-    printColoured("\n[1/3] Updating build.gradle.kts...", BLUE)
+    printColoured("\n[1/4] Updating build.gradle.kts...", BLUE)
     updateBuildFile(buildFile, newVersionCode, newVersionName)
     printColoured("✓ Version updated successfully", GREEN)
 
     // Run gradle clean
-    printColoured("\n[2/3] Running Gradle clean...", BLUE)
+    printColoured("\n[2/4] Running Gradle clean...", BLUE)
     if (!runCommand("./gradlew clean")) {
         printColoured("✗ Gradle clean failed!", RED)
         kotlin.system.exitProcess(1)
@@ -123,18 +123,27 @@ try {
     printColoured("✓ Clean completed", GREEN)
 
     // Run gradle assembleRelease
-    printColoured("\n[3/3] Running Gradle assembleRelease...", BLUE)
+    printColoured("\n[3/4] Running Gradle assembleRelease...", BLUE)
     if (!runCommand("./gradlew assembleRelease")) {
         printColoured("✗ Gradle assembleRelease failed!", RED)
         kotlin.system.exitProcess(1)
     }
-    printColoured("✓ Release build completed", GREEN)
+    printColoured("✓ APK build completed", GREEN)
+
+    // Run gradle bundleRelease
+    printColoured("\n[4/4] Running Gradle bundleRelease...", BLUE)
+    if (!runCommand("./gradlew bundleRelease")) {
+        printColoured("✗ Gradle bundleRelease failed!", RED)
+        kotlin.system.exitProcess(1)
+    }
+    printColoured("✓ AAB build completed", GREEN)
 
     // Success message
     printColoured("\n╔════════════════════════════════════════╗", GREEN)
     printColoured("║        BUILD SUCCESSFUL! ✓             ║", GREEN)
     printColoured("╚════════════════════════════════════════╝", GREEN)
     printColoured("\nAPK location: app/build/outputs/apk/release/waifuVault-v$newVersionName.apk", BLUE)
+    printColoured("AAB location: app/build/outputs/bundle/release/app-release.aab", BLUE)
 
 } catch (e: Exception) {
     printColoured("\n✗ Error: ${e.message}", RED)

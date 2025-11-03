@@ -21,7 +21,8 @@ import java.io.File
 data class SelectedFile(
     val uri: Uri,
     val name: String,
-    val size: Long
+    val size: Long,
+    val mimeType: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,20 +35,47 @@ fun UploadScreen(
     val uploadOptions by viewModel.uploadOptions.collectAsState()
 
     var selectedFiles by remember { mutableStateOf<List<SelectedFile>>(emptyList()) }
+    var validationErrors by remember { mutableStateOf<List<String>>(emptyList()) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
-        selectedFiles = uris.map { uri ->
+        // Collect all file info
+        val allFiles = uris.map { uri ->
             SelectedFile(
                 uri = uri,
                 name = FileUtils.getFileName(context, uri) ?: "Unknown",
-                size = FileUtils.getFileSize(context, uri)
+                size = FileUtils.getFileSize(context, uri),
+                mimeType = FileUtils.getMimeType(context, uri)
+            )
+        }
+
+        // Validate files
+        val filesToValidate = allFiles.map { it.name to it.size }
+        val mimeTypesMap = allFiles.associate { it.name to it.mimeType }
+        val validationResult = viewModel.validateFilesForSelection(filesToValidate, mimeTypesMap)
+
+        // Only add valid files to selection
+        selectedFiles = allFiles.filter { file ->
+            validationResult.validFiles.any { it.first == file.name }
+        }
+
+        // Store validation errors
+        validationErrors = validationResult.invalidFiles
+    }
+
+    LaunchedEffect(validationErrors) {
+        if (validationErrors.isNotEmpty()) {
+            snackbarHostState.showSnackbar(
+                message = "${validationErrors.size} file(s) rejected. See below for details.",
+                duration = SnackbarDuration.Long
             )
         }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("WaifuVault") }
@@ -122,6 +150,44 @@ fun UploadScreen(
                                     Icon(Icons.Default.Close, contentDescription = "Remove")
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            // Validation Errors Display
+            if (validationErrors.isNotEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Invalid Files Rejected",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        validationErrors.forEach { error ->
+                            Text(
+                                "• $error",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(onClick = { validationErrors = emptyList() }) {
+                            Text("Dismiss")
                         }
                     }
                 }
