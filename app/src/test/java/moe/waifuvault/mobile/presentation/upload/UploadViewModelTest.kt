@@ -32,6 +32,11 @@ class UploadViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         repository = mockk()
+
+        coEvery { repository.getRestrictions() } returns Result.success(
+            moe.waifuvault.mobile.domain.model.Restrictions.DEFAULT
+        )
+
         viewModel = UploadViewModel(repository)
         testFile = File.createTempFile("test", ".jpg")
         testFile.writeText("test content")
@@ -450,5 +455,182 @@ class UploadViewModelTest {
 
         // Clean up manually for test cleanup
         tempFile.delete()
+    }
+
+    // Restrictions Validation Tests
+
+    @Test
+    fun `validateFilesForSelection accepts files within size limit`() {
+        val files = listOf(
+            "small.jpg" to 1024L, // 1KB
+            "medium.png" to 1024L * 1024L // 1MB
+        )
+        val mimeTypes = mapOf(
+            "small.jpg" to "image/jpeg",
+            "medium.png" to "image/png"
+        )
+
+        val result = viewModel.validateFilesForSelection(files, mimeTypes)
+
+        assertEquals(2, result.validFiles.size)
+        assertTrue(result.invalidFiles.isEmpty())
+    }
+
+    @Test
+    fun `validateFilesForSelection rejects files over size limit`() {
+        val files = listOf(
+            "huge.mp4" to 3L * 1024L * 1024L * 1024L, // 3GB (over 2GB limit)
+            "normal.jpg" to 1024L * 1024L // 1MB
+        )
+        val mimeTypes = mapOf(
+            "huge.mp4" to "video/mp4",
+            "normal.jpg" to "image/jpeg"
+        )
+
+        val result = viewModel.validateFilesForSelection(files, mimeTypes)
+
+        assertEquals(1, result.validFiles.size)
+        assertEquals("normal.jpg", result.validFiles[0].first)
+        assertEquals(1, result.invalidFiles.size)
+        assertTrue(result.invalidFiles[0].contains("huge.mp4"))
+        assertTrue(result.invalidFiles[0].contains("Too large"))
+    }
+
+    @Test
+    fun `validateFilesForSelection rejects banned MIME types`() {
+        val files = listOf(
+            "malware.exe" to 1024L,
+            "archive.jar" to 1024L,
+            "photo.jpg" to 1024L
+        )
+        val mimeTypes = mapOf(
+            "malware.exe" to "application/x-dosexec", // Banned
+            "archive.jar" to "application/x-java-archive", // Banned
+            "photo.jpg" to "image/jpeg" // Allowed
+        )
+
+        val result = viewModel.validateFilesForSelection(files, mimeTypes)
+
+        assertEquals(1, result.validFiles.size)
+        assertEquals("photo.jpg", result.validFiles[0].first)
+        assertEquals(2, result.invalidFiles.size)
+        assertTrue(result.invalidFiles.any { it.contains("malware.exe") && it.contains("Banned file type") })
+        assertTrue(result.invalidFiles.any { it.contains("archive.jar") && it.contains("Banned file type") })
+    }
+
+    @Test
+    fun `validateFilesForSelection allows null MIME types`() {
+        val files = listOf(
+            "unknown.bin" to 1024L
+        )
+        val mimeTypes = mapOf(
+            "unknown.bin" to null
+        )
+
+        val result = viewModel.validateFilesForSelection(files, mimeTypes)
+
+        assertEquals(1, result.validFiles.size)
+        assertTrue(result.invalidFiles.isEmpty())
+    }
+
+    @Test
+    fun `validateFilesForSelection handles mixed valid and invalid files`() {
+        val files = listOf(
+            "valid1.jpg" to 1024L,
+            "too_large.mp4" to 3L * 1024L * 1024L * 1024L, // 3GB
+            "valid2.png" to 2048L,
+            "banned.exe" to 1024L,
+            "valid3.txt" to 512L
+        )
+        val mimeTypes = mapOf(
+            "valid1.jpg" to "image/jpeg",
+            "too_large.mp4" to "video/mp4",
+            "valid2.png" to "image/png",
+            "banned.exe" to "application/x-dosexec",
+            "valid3.txt" to "text/plain"
+        )
+
+        val result = viewModel.validateFilesForSelection(files, mimeTypes)
+
+        assertEquals(3, result.validFiles.size)
+        assertTrue(result.validFiles.any { it.first == "valid1.jpg" })
+        assertTrue(result.validFiles.any { it.first == "valid2.png" })
+        assertTrue(result.validFiles.any { it.first == "valid3.txt" })
+
+        assertEquals(2, result.invalidFiles.size)
+        assertTrue(result.invalidFiles.any { it.contains("too_large.mp4") })
+        assertTrue(result.invalidFiles.any { it.contains("banned.exe") })
+    }
+
+    @Test
+    fun `validateFilesForSelection handles all invalid files`() {
+        val files = listOf(
+            "huge.mp4" to 3L * 1024L * 1024L * 1024L,
+            "malware.exe" to 1024L
+        )
+        val mimeTypes = mapOf(
+            "huge.mp4" to "video/mp4",
+            "malware.exe" to "application/x-dosexec"
+        )
+
+        val result = viewModel.validateFilesForSelection(files, mimeTypes)
+
+        assertTrue(result.validFiles.isEmpty())
+        assertEquals(2, result.invalidFiles.size)
+    }
+
+    @Test
+    fun `validateFilesForSelection handles empty file list`() {
+        val result = viewModel.validateFilesForSelection(emptyList(), emptyMap())
+
+        assertTrue(result.validFiles.isEmpty())
+        assertTrue(result.invalidFiles.isEmpty())
+    }
+
+    @Test
+    fun `showValidationError sets error state with message`() = runTest {
+        viewModel.uploadState.test {
+            assertEquals(UploadState.Idle, awaitItem())
+
+            viewModel.showValidationError("• file1.exe: Banned file type\n• file2.mp4: Too large")
+
+            val errorState = awaitItem()
+            assertTrue(errorState is UploadState.Error)
+            assertTrue((errorState as UploadState.Error).message.contains("Invalid files were shared"))
+            assertTrue(errorState.message.contains("file1.exe"))
+            assertTrue(errorState.message.contains("file2.mp4"))
+        }
+    }
+
+    @Test
+    fun `restrictions are fetched on ViewModel initialization`() = runTest {
+        // Verify that getRestrictions was called during setup
+        coVerify(exactly = 1) { repository.getRestrictions() }
+    }
+
+    @Test
+    fun `validation uses custom restrictions when API returns different values`() = runTest {
+        val customRepository = mockk<FileRepository>()
+        val customRestrictions = moe.waifuvault.mobile.domain.model.Restrictions(
+            maxFileSize = 1024L * 1024L, // 1MB limit
+            bannedMimeTypes = setOf("image/png") // Ban PNG files
+        )
+
+        coEvery { customRepository.getRestrictions() } returns Result.success(customRestrictions)
+
+        val customViewModel = UploadViewModel(customRepository)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Test that 2MB file is rejected
+        val files1 = listOf("large.jpg" to 2L * 1024L * 1024L)
+        val result1 = customViewModel.validateFilesForSelection(files1, mapOf("large.jpg" to "image/jpeg"))
+        assertTrue(result1.validFiles.isEmpty())
+        assertTrue(result1.invalidFiles.isNotEmpty())
+
+        // Test that PNG is rejected
+        val files2 = listOf("image.png" to 1024L)
+        val result2 = customViewModel.validateFilesForSelection(files2, mapOf("image.png" to "image/png"))
+        assertTrue(result2.validFiles.isEmpty())
+        assertTrue(result2.invalidFiles.isNotEmpty())
     }
 }

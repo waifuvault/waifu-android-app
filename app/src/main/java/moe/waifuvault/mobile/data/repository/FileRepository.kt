@@ -17,6 +17,44 @@ class FileRepository(
     private val api: WaifuVaultApi = ApiClient.waifuVaultApi
 ) {
 
+    suspend fun getRestrictions(): Result<Restrictions> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getRestrictions()
+
+            if (response.isSuccessful && response.body() != null) {
+                val restrictions = response.body()!!
+                var maxFileSize = Restrictions.DEFAULT.maxFileSize
+                val bannedMimeTypes = mutableSetOf<String>()
+
+                restrictions.forEach { restriction ->
+                    when (restriction.type) {
+                        "MAX_FILE_SIZE" -> {
+                            maxFileSize = restriction.value.toLongOrNull() ?: maxFileSize
+                        }
+                        "BANNED_MIME_TYPE" -> {
+                            bannedMimeTypes.addAll(
+                                restriction.value.split(",").map { it.trim() }
+                            )
+                        }
+                    }
+                }
+
+                Result.success(
+                    Restrictions(
+                        maxFileSize = maxFileSize,
+                        bannedMimeTypes = bannedMimeTypes
+                    )
+                )
+            } else {
+                // Return default restrictions if API call fails
+                Result.success(Restrictions.DEFAULT)
+            }
+        } catch (e: Exception) {
+            // Return default restrictions on error
+            Result.success(Restrictions.DEFAULT)
+        }
+    }
+
     suspend fun uploadFile(
         file: File,
         options: FileUploadOptions

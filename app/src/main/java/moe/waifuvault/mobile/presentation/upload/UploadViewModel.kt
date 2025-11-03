@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class UploadViewModel(
-    repository: FileRepository
+    private val repository: FileRepository
 ) : ViewModel() {
 
     private val uploadFileUseCase = UploadFileUseCase(repository)
@@ -35,9 +35,46 @@ class UploadViewModel(
     val uploadOptions: StateFlow<UploadOptions> = _uploadOptions.asStateFlow()
 
     private var tempFilesToCleanup = mutableListOf<File>()
+    private var restrictions: moe.waifuvault.mobile.domain.model.Restrictions? = null
+
+    init {
+        // Fetch restrictions when ViewModel is created
+        viewModelScope.launch {
+            val result = repository.getRestrictions()
+            restrictions = result.getOrNull()
+        }
+    }
 
     fun uploadFile(file: File) {
         uploadFiles(listOf(file))
+    }
+
+    data class FileValidationResult(
+        val validFiles: List<Pair<String, Long>>, // name, size pairs
+        val invalidFiles: List<String> // error messages
+    )
+
+    fun validateFilesForSelection(files: List<Pair<String, Long>>, mimeTypes: Map<String, String?>): FileValidationResult {
+        val validFiles = mutableListOf<Pair<String, Long>>()
+        val invalidFiles = mutableListOf<String>()
+        val currentRestrictions = restrictions ?: moe.waifuvault.mobile.domain.model.Restrictions.DEFAULT
+
+        files.forEach { (name, size) ->
+            val mimeType = mimeTypes[name]
+
+            // Check file size
+            if (!currentRestrictions.isFileSizeValid(size)) {
+                invalidFiles.add("$name: Too large (${moe.waifuvault.mobile.util.FileUtils.formatFileSize(size)}). Max: ${currentRestrictions.formatMaxFileSize()}")
+            }
+            // Check MIME type
+            else if (!currentRestrictions.isMimeTypeAllowed(mimeType)) {
+                invalidFiles.add("$name: Banned file type (${mimeType ?: "unknown"})")
+            } else {
+                validFiles.add(Pair(name, size))
+            }
+        }
+
+        return FileValidationResult(validFiles, invalidFiles)
     }
 
     fun uploadFiles(files: List<File>, shouldCleanup: Boolean = false) {
@@ -47,6 +84,7 @@ class UploadViewModel(
         if (files.isEmpty()) return
 
         viewModelScope.launch {
+            // Files are already validated at selection time, so proceed directly to upload
             if (files.size == 1) {
                 _uploadState.value = UploadState.Uploading(0)
             } else {
@@ -151,6 +189,13 @@ class UploadViewModel(
 
     fun updateUploadOptions(options: UploadOptions) {
         _uploadOptions.value = options
+    }
+
+    fun showValidationError(message: String) {
+        _uploadState.value = UploadState.Error(
+            "Invalid files were shared:\n$message",
+            Exception("File validation failed")
+        )
     }
 
     fun resetUploadState() {

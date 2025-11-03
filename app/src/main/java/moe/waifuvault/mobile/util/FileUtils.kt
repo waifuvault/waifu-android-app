@@ -45,6 +45,10 @@ object FileUtils {
         }
     }
 
+    fun getMimeType(context: Context, uri: Uri): String? {
+        return context.contentResolver.getType(uri)
+    }
+
     fun formatFileSize(bytes: Long): String {
         return when {
             bytes < 1024 -> "$bytes B"
