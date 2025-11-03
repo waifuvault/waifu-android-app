@@ -24,7 +24,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -33,12 +33,12 @@ android {
     }
 
     signingConfigs {
-        create("release") {
+        register("release") {
             if (keystorePropertiesFile.exists()) {
-                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile") as String)
+                storePassword = keystoreProperties.getProperty("storePassword") as String
+                keyAlias = keystoreProperties.getProperty("keyAlias") as String
+                keyPassword = keystoreProperties.getProperty("keyPassword") as String
             }
         }
     }
@@ -58,9 +58,10 @@ android {
     }
 
     applicationVariants.all {
+        val variant = this
         outputs.all {
             (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
-                "waifuVault-v${defaultConfig.versionName}.apk"
+                "waifuVault-v${variant.versionName}.apk"
         }
     }
 
